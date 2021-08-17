@@ -10,7 +10,7 @@ README = (HERE / "README.md").read_text()
 
 setup(
     name="photongui",
-    version="1.0.0",
+    version="1.0.1",
     description="Build GUI in Python with JavaScript, HTML, and CSS.",
     long_description=README,
     long_description_content_type="text/markdown",
