@@ -20,9 +20,10 @@ window_settings = {
     "view" : "https://github.com/Mohamed501258/photongui"
 }
 
-photongui.createWindow(window_settings)
+window = photongui.createWindow(window_settings=window_settings)
 
-photongui.start()
+if __name__ == "__main__":
+    photongui.start()
 ```
 ## More details
 ### Window settings
