@@ -1,0 +1,112 @@
+
+
+* {
+  box-sizing: border-box;
+}
+body {
+  background-color: blueviolet;
+  margin: 0%;
+  padding: 0%;
+  font-family: "Poppins", sans-serif;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+h1 {
+  color: white;
+  font-size: 60px;
+  margin: 0 20px;
+}
+
+.todolist {
+  width: 500px;
+  min-height: 300px;
+  border: 2px solid white;
+  border-radius: 0px 0px 100px 100px;
+  padding: 20px 20px 100px 20px;
+  margin-top: 30px;
+  background-image: radial-gradient(rgb(176, 115, 233), blueviolet);
+}
+
+.todolist li {
+  color: white;
+  font-size: 24px;
+  margin-left: 20px;
+  margin-bottom: 10px;
+  padding-bottom: 5px;
+
+  border-bottom: 1px solid white;
+  word-break: break-word;
+}
+li button {
+  float: right;
+  color: blueviolet;
+  margin-left: 5px;
+  font-size: 20px;
+  border-radius: 5px;
+  border: 0px solid transparent;
+  border: 1px solid white;
+  transition: 0.2s all ease-in-out;
+}
+
+li button:hover {
+  background-color: blueviolet;
+  color: white;
+}
+#inputtask {
+  min-width: 300px;
+  padding: 10px 15px;
+  border-radius: 10px;
+  border: 0px solid transparent;
+  font-size: 24px;
+  margin-right: 10px;
+  color: blueviolet;
+}
+
+#inputtask:focus {
+  outline: none;
+}
+
+#addbutton,
+.clear {
+  color: blueviolet;
+  font-weight: 500;
+  font-size: 24px;
+  border-radius: 5px;
+  border: 0px solid transparent;
+  padding: 10px 15px;
+  cursor: pointer;
+  border: 1px solid rgb(255, 255, 255);
+  transition: 0.3s all ease-in-out;
+}
+#addbutton:hover,
+.clear:hover {
+  background-color: rgba(194, 129, 255, 0.253);
+  color: white;
+  transform: scale(0.97);
+}
+.d-none {
+  display: none;
+}
+
+li span:focus {
+  background-color: white;
+  color: black;
+  outline: none;
+  padding: 0 5px;
+  display: inline-block;
+  min-width: 300px;
+  max-width: 400px;
+}
+
+.link {
+  text-align: center;
+  margin: 20px;
+}
+.link a {
+  color: white;
+}
