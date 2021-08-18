@@ -91,6 +91,5 @@ settings = {
 
 window = photongui.createWindow(window_settings=settings)
 
-
 photongui.start()
 ```

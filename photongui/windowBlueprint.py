@@ -268,22 +268,32 @@ class windowFrame(tk.Frame):
         windowsId[self.window.winfo_id()] = self
 
     def __does_window_exist(self):
-        if not self.master.winfo_exists(): # we check if window exists or not to avoid creshes
-            photongui.logger.error("The window doesn't exist!")
+        try:
+            if self.master.winfo_exists(): # we check if window exists or not to avoid crashes
+                return True
+            else:
+                photongui.logger.error("The window doesn't exist!")
+                return False
+        except:
+            photongui.logger.error("Can't check if window exist or not")
             return False
-        else:
-            return True
 
     def __check_window_and_browser(self):
-        if not self.master.winfo_exists(): # we check if window exists or not to avoid creshes
-            photongui.logger.error("The window doesn't exist!")
-            return False
+        try:
+            if self.master.winfo_exists(): # we check if window exists or not to avoid crashes
+                pass
+            else:
+                photongui.logger.error("The window doesn't exist!")
+                return False
 
-        while not self.__browser_frame.initialized:
-            time.sleep(0.5)  
+            while not self.__browser_frame.initialized:
+                time.sleep(0.5)  
         
-        return True
-
+            return True
+        except:
+            photongui.logger.error("Can't check window or browsr")
+            return False
+            
     # public methods    
     def setWindowAsModal(self, parent):
         try:
@@ -363,13 +373,13 @@ class windowFrame(tk.Frame):
         self.__browser_frame.browser.ExecuteJavascript(inject)
     
     def execJsAsync(self, js_code): # execute js code asynchronously
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid creshes
+        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
             return  
 
         self.__browser_frame.browser.ExecuteJavascript(js_code)
 
     def execJsSync(self, js_code): # execute js code synchronously
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid creshes
+        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
             return 
 
         operation_id = self.__create_random_id()
@@ -382,97 +392,97 @@ class windowFrame(tk.Frame):
         return return_value
 
     def execJsFunctionAsync(self, function_name, function_parameres=[]):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid creshes
+        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
             return 
         self.__browser_frame.browser.ExecuteFunction(function_name, function_parameres)
 
     def getUrl(self):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid creshes
+        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
             return 
         return self.__browser_frame.browser.GetUrl() 
  
     def getZoomLevel(self):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid creshes
+        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
             return 
         return self.__browser_frame.browser.GetZoomLevel()
     
     def setZoomLevel(self, zoom_level=0):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid creshes
+        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
             return 
         self.__browser_frame.browser.SetZoomLevel(zoom_level)
 
     def canGoForward(self):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid creshes
+        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
             return 
         return self.__browser_frame.browser.CanGoForward()
 
     def goForward(self):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid creshes
+        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
             return 
         self.__browser_frame.browser.GoForward()
     
     def canGoBack(self):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid creshes
+        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
             return         
         return self.__browser_frame.browser.CanGoBack()
 
     def goBack(self):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid creshes
+        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
             return         
         self.__browser_frame.browser.GoBack()
    
     def findInBrowser(self, search_id=None, search_text="", forward=False, match_case=False, find_next=False):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid creshes
+        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
             return         
         self.__browser_frame.browser.Find(search_id, search_text, forward, match_case, find_next)
 
     def stopFinding(self, clear_selection=True):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid creshes
+        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
             return         
         self.__browser_frame.browser.StopFinding(clear_selection)
 
     def downloadFromURL(self, url=None):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid creshes
+        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
             return         
         self.__browser_frame.browser.StartDownload(url)
     
     def reloadWindow(self): # Reload the current page without ignoring any cached data.
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid creshes
+        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
             return         
         self.__browser_frame.browser.Reload()
     
     def reloadWindoInogreCache(self): # Reload the current page ignoring any cached data.
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid creshes
+        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
             return         
         self.__browser_frame.browser.ReloadIgnoreCache()
 
     def isWindowLoaded(self):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid creshes
+        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
             return         
         return self.__browser_frame.browser.HasDocument()
     
     def stopLoadingPage(self):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid creshes
+        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
             return         
         self.__browser_frame.browser.StopLoad()
 
     def printWindowContent(self):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid creshes
+        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
             return         
         return self.__browser_frame.browser.Print()
     
     def sendKeyEvent(self, key_event=None):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid creshes
+        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
             return         
         self.__browser_frame.browser.SendKeyEvent(key_event)
 
     def sendMouseMoveEvent(self,x=0, y=0, mouse_leave=False):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid creshes
+        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
             return         
         self.__browser_frame.browser.SendMouseMoveEvent(x, y, mouse_leave)
 
     def sendMouseClickEvent(self, x=0, y=0, mouseButtonType=1, mouseUp=True, clickCount=1, modifiers=1):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid creshes
+        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
             return         
         """ How to use it:
         - x [int]
@@ -501,7 +511,7 @@ class windowFrame(tk.Frame):
         self.__browser_frame.browser.SendMouseClickEvent(x, y, mouseButtonType, mouseUp, clickCount, modifiers)
     
     def sendMouseWheelEvent(self, x=0, y=0, deltaX=0, deltaY=0, modifiers=1):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid creshes
+        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
             return 
                     
         """ How to use it:
@@ -532,7 +542,7 @@ class windowFrame(tk.Frame):
         self.__browser_frame.browser.SendMouseWheelEvent(x, y, deltaX, deltaY, modifiers)
 
     def setAccessibilityState(self, state="default"):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid creshes
+        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
             return         
         """Available state:
         - default
