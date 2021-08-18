@@ -1,9 +1,8 @@
 # PhotonGUI
 **photongui** is a cross-platform tool that allows you to create Python programs with HTML, CSS, JS. You can use the web technologies in your desktop application. 
 
-**photongui** uses tkinter, so you have all its functionnaliy and power. **photongui** is available only for Python 3.
+**photongui** uses tkinter, so you have all its functionality and power. **photongui** is available only for Python 3.
 
-**photongui** is created by *Muhammed Bassiouni*.
 
 ## Getting started
 
@@ -86,7 +85,7 @@ window = photongui.createWindow()
 
 def main(text):
     body_content = window.execJsSync("document.body.innerText")
-    print(body_content)
+    print(body_content, f"\n{text}")
     
 photongui.start(function=main, parameters=["This is text"], debug=True)
 ```

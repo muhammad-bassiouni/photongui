@@ -33,7 +33,10 @@ windowsId = {}
 evt = threading.Event()
 
 # Global stuff
-default_html_code = os.path.join(os.getcwd(), "photongui/gui/html/welcome.html")
+# Some WindowsOS styles, required for task bar integration
+GWL_EXSTYLE = -20
+WS_EX_APPWINDOW = 0x00040000
+WS_EX_TOOLWINDOW = 0x00000080
 
 
 # Global config
@@ -177,7 +180,6 @@ class windowFrame(tk.Frame):
         self.window.after(20, self.__setIcon, self.icon)
         self.window.attributes('-fullscreen', self.fullscreen, '-topmost',self.on_top, '-alpha',self.transparency, '-disabled',self.disabled)
         self.window.configure(bg=self.background_color)
-        self.window.overrideredirect(self.borderless)
         self.window.resizable(self.resizable[0], self.resizable[1])
         # start window in minimized mode
         """ this integration cause the following issue: related to cef -> it freezes the whole browser
@@ -205,12 +207,15 @@ class windowFrame(tk.Frame):
             self.window.attributes('-toolwindow', True)
         if self.position:
             self.__centerTheWindowByDefault = False
-            self.window.geometry(f"{self.width}x{self.height}+{self.width}+{self.height}")
+            self.window.geometry(f"{self.width}x{self.height}+{self.position[0]}+{self.position[1]}")
         if not self.position:
             self.__centerWindow()
         if not self.movable:
-            #self.window.bind_all('<Configure>', self.__fixWindowPosition)
-            pass
+            self.window.bind_all('<Configure>', self.__fixWindowPosition)
+        if self.borderless:
+            self.window.overrideredirect(self.borderless)
+            if WINDOWS:
+                self.window.after(100, self.__set_taskbar_icon_for_borderless_window)
         
         self.__add_windowId_to_dict()
 
@@ -227,6 +232,16 @@ class windowFrame(tk.Frame):
             icon_path = os.path.join(os.path.dirname(__file__), "gui\images\icon.png")
             icon = tk.PhotoImage(file=icon_path)
             self.window.tk.call('wm', 'iconphoto', self.window._w, icon)  
+
+    def __set_taskbar_icon_for_borderless_window(self):
+        hwnd = ctypes.windll.user32.GetParent(self.window.winfo_id())
+        stylew = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+        stylew = stylew & ~WS_EX_TOOLWINDOW
+        stylew = stylew | WS_EX_APPWINDOW
+        res = ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, stylew)
+        # re-assert the new window style
+        self.window.wm_withdraw()
+        self.window.after(10, self.window.wm_deiconify)
 
     def __centerWindow(self):
         if self.__centerTheWindowByDefault:
@@ -293,7 +308,7 @@ class windowFrame(tk.Frame):
         except:
             photongui.logger.error("Can't check window or browsr")
             return False
-            
+
     # public methods    
     def setWindowAsModal(self, parent):
         try:
