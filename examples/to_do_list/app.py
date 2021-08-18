@@ -7,7 +7,7 @@ import os
 util = Util()
 util.exposeAll("ToDoList", locals())
 
-indexFile = os.path.join(os.path.dirname(__file__), "index.html")
+indexFile = os.path.join(os.path.dirname(__file__), "view/index.html")
 print(indexFile)
 
 settings = {
