@@ -1,3 +1,10 @@
+"""
+BSD 3-Clause License
+
+Copyright (c) 2021, Muhammed Bassiouni
+All rights reserved.
+"""
+
 from cefpython3 import cefpython as cef
 import ctypes 
 try:

@@ -65,7 +65,7 @@ window.execPy = function(ExposedEnvironName, pyCode){
                 delete execPyOperations[js_operation_id]
                 resolve(return_value);
             }
-        }, 500);
+        }, 50);
     });
 }
 
