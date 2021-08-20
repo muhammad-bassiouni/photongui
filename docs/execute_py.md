@@ -9,11 +9,11 @@ util.exposeAll(name="mainApp", environ=locals())
 
 window = photongui.createWindow()
 
-def main():
+def print_url():
     currentUrl = window.getUrl()
     print(currentUrl)
 
-photongui.start(function=main, debug=True)
+photongui.start(debug=True)
 ```
 
 To execute Python code from JS:
@@ -37,7 +37,7 @@ Now you are ready to go and get value of any variable or execute any function an
 
 - In your JS code, you can execute python code using `window.execPy`
     ```javascript
-    window.execPy(window.mainApp, "main()").then(function(r){console.log(r)})
+    window.execPy(window.mainApp, "print_url()")
     ```
    
     **window.execPy()**
