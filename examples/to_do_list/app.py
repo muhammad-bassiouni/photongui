@@ -39,7 +39,7 @@ def edit(oldTodo, newTodo):
         if item["task"] == oldTodo:
             item["task"] = newTodo
             item["status"] = "updated"
-            print("one task is updated: ", item, " The new update is: ", newTodo)
+            print("one item is updated: ", item, " The new update is: ", newTodo)
             print("All Tasks: ", ToDos)
 
 def deleteAll():

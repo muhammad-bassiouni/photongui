@@ -16,10 +16,8 @@ form.addEventListener("submit", function (event) {
     clear.classList.remove("d-none");
   }
 
-  clear.addEventListener("click", function () {
-    toDoList.innerHTML = "";
-  });
 });
+
 
 function createNewItem(inputValue) {
   const task = document.createElement("li");
@@ -39,6 +37,7 @@ function createNewItem(inputValue) {
     window.execPy(window.ToDoList, `delete('${taskToBeDeleted}')`)
     task.parentNode.removeChild(task);
   });
+
   editBtn.addEventListener("click", function () {
     oldText = span.textContent
     span.contentEditable = true;
@@ -51,3 +50,8 @@ function createNewItem(inputValue) {
 
   return task;
 }
+
+clear.addEventListener("click", function () {
+  toDoList.innerHTML = "";
+  window.execPy(window.ToDoList, `deleteAll()`)
+});

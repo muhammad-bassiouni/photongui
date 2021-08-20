@@ -5,7 +5,7 @@ try:
 except ImportError:
     import tkinter as tk
 import tkinter.filedialog as tkfiledialog
-from tkinter.messagebox import askyesno
+import tkinter.messagebox as tkmessagebox
 import os
 import threading
 import platform
@@ -16,7 +16,7 @@ import time
 
 import photongui
 
-from photongui.api import py_js_bridge, css, drag, loadSnippet
+from photongui.api import py_js_bridge, css, drag, loadSnippet, alert
 import photongui.window
 
 # Fix for PyCharm hints warnings
@@ -60,7 +60,7 @@ WINDOW_SETTINGS = {
     "borderless":False,
     "border_color":None,
     "border_thickness":None,
-    "padding":None,
+    "padding":(0,0),
     "toolwindow":True,
     "allow_minimize":True,
     "allow_maximize":True,
@@ -71,6 +71,7 @@ WINDOW_SETTINGS = {
     "transparentcolor":None,
     "allow_text_selection":False,
     "flexible_drag":False,
+    "closable":True
 }
 
 BROWSER_SETTINGS = {
@@ -118,8 +119,11 @@ class Util:
             return_value = str(e)
             status = 500
         windowsId[windowid].execJsFunctionAsync("execJs", ["return", status, operationid, return_value])
-        
 
+def custom_alert(alert_message, windowid):
+    tkmessagebox.showinfo(title="Alert", message=alert_message, parent=windowsId[windowid])
+
+bindings.SetFunction("customAlert", custom_alert)
 bindings.SetFunction("pyCallBack", pyCallBack)
 
 
@@ -149,7 +153,7 @@ class windowFrame(tk.Frame):
 
         self.__set_default_window_settings() # after generating the required attributes to initiate the window, now we structure the window based on them
 
-        tk.Frame.__init__(self, self.window, highlightbackground=self.border_color, highlightthickness=self.border_thickness, bd=self.padding)
+        tk.Frame.__init__(self, self.window, highlightbackground=self.border_color, highlightthickness=self.border_thickness, padx=self.padding[0], pady=self.padding[1])
         self.master.protocol("WM_DELETE_WINDOW", self.__on_close)
         self.master.bind("<Destroy>", self.__on_destroy)
         self.master.bind("<Configure>", self.__on_window_configure)
@@ -181,11 +185,9 @@ class windowFrame(tk.Frame):
         self.window.attributes('-fullscreen', self.fullscreen, '-topmost',self.on_top, '-alpha',self.transparency, '-disabled',self.disabled)
         self.window.configure(bg=self.background_color)
         self.window.resizable(self.resizable[0], self.resizable[1])
-        # start window in minimized mode
-        """ this integration cause the following issue: related to cef -> it freezes the whole browser
-        if self.minimized:
+        
+        if self.minimized: # this integration causeس the following issue: related to cef -> it freezes the whole browser
             self.window.iconify()
-        """
         if self.__modal:
             if self.__parent:
                 self.setWindowAsModal(self.__parent)
@@ -221,7 +223,7 @@ class windowFrame(tk.Frame):
 
     def __setIcon(self, iconPath):
         icon_path = iconPath
-        if os.path.exists(icon_path) and icon_path.endswith(".png"):
+        if os.path.exists(icon_path) and (icon_path.endswith(".png") or icon_path.endswith(".pgm") or icon_path.endswith(".ppm") or icon_path.endswith(".gif")):
             try:
                 icon = tk.PhotoImage(file=icon_path)
                 self.window.tk.call('wm', 'iconphoto', self.window._w, icon)
@@ -318,6 +320,22 @@ class windowFrame(tk.Frame):
             parent.attributes('-disabled', True)
         #self.window.grab_set() # this causes other windows to be not closed correctly
         self.window.wm_transient(parent)
+    
+    def messagebox(self, action, title=None, message=None):
+        if action == "warning":
+            return tkmessagebox.showwarning(title, message, parent=self.window)
+        if action == "error":
+            return tkmessagebox.showerror(title, message, parent=self.window)
+        if action == "info":
+            return tkmessagebox.showinfo(title, message, parent=self.window)
+        if action == "question":
+            return tkmessagebox.askquestion(title, message, parent=self.window)
+        if action == "okcancel":
+            return tkmessagebox.askokcancel(title, message, parent=self.window)
+        if action == "yesnocancel":
+            return tkmessagebox.askyesnocancel(title, message, parent=self.window)
+        if action == "yesno":
+            return tkmessagebox.askyesno(title, message, parent=self.window)
 
     def fileDialog(self, action, title=None, default_extenxion=None, file_types=None, initial_dir=None, initial_file=None, allow_multiple=False):
         """
@@ -606,8 +624,10 @@ class windowFrame(tk.Frame):
                 photongui.root.destroy()
 
     def __on_close(self):
+        if not self.closable:
+            return
         if self.__confirm_close:
-            if askyesno(title="Close window", message="Are you sure that you want to exit?", parent=self.window):
+            if tkmessagebox.askyesno(title="Close window", message="Are you sure that you want to exit?", parent=self.window):
                 pass
             else:
                 return
@@ -760,7 +780,8 @@ class LoadHandler():
                 injection += css.src
             if self.windowFrame.flexible_drag:
                 injection += drag.src
-  
+            injection += alert.src
+
             browser.ExecuteJavascript(injection) 
             time.sleep(0.1)
             self.browser_frame.initialized = True
@@ -777,4 +798,6 @@ class LoadHandler():
         photongui.logger.error(f'Window: {self.windowFrame.title} ' + error_msg)
         browser.ExecuteJavascript(msg_js)
         
-        
+
+
+  

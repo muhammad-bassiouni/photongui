@@ -1,6 +1,6 @@
 ## Debugging
 
-To allow debugging set **debug** parameter to **True**
+To allow debugging set `debug` parameter to `True`
 
 
 ```python
@@ -11,9 +11,9 @@ window = photongui.createWindow()
 photongui.start(debug=True)
 ```
 
-By activating this option, you can open devtools and access the console by right click on the window.
+Now right-click on the window and you can access **Developer Tools**.
 
-### You can also specify the logging level by passing **debug_level**
+You can also specify the logging level by passing `debug_level`
 
 ```python
 import photongui

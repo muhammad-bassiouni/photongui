@@ -1,9 +1,5 @@
 ## Execute Python code from window
 
-To execute Python code from window, you have to set somethings first.
-
-- You have to expose local variables and functions to the window
-
 ```python
 import photongui
 from photongui import Util
@@ -19,35 +15,41 @@ def main():
 
 photongui.start(function=main, debug=True)
 ```
-In the previous example we have imported **Util** from **photongui**, we are going to use it to expose all local functions and variables to the window
 
-```python
-util = Util()
-util.exposeAll(name="mainApp", environ=locals())
-```
+To execute Python code from JS:
 
-### using method **exposeAll** to expose locals. 
-  - **name**: giving all locals single name to make it easy for accessing them from the window
-  - **environ**: you have to set its value to be **locals()**
+- You have to expose local variables and functions to the window.
+  
+    In the previous example we have imported **Util** from **photongui**, we are going to use it to expose all local functions and variables to the window.
 
-after doing that, now you are ready to go and get value of any variable or execute any function and get its return value in this environment.
-
-In your JS code, you can execute python code using **window.execPy**
-```javascript
-window.execPy(window.mainApp, "main()").then(function(r){console.log(r)})
-```
-**window.execPy(environ, pythonCode)**
-
-- **environ**: is envrion we have exposed in python
     ```python
     util = Util()
     util.exposeAll(name="mainApp", environ=locals())
     ```
-    you can access it by typing **window.&lt;The name you have set in python&gt;** which is **mainApp** in the previous example
+    **exposeAll()**
+    | Parameters | Details |
+    |---|---|
+    | name       | the exposed environment name that you will use to access it later |
+    | environ    | you have to set its value to be **locals()** |
 
-- **pythonCode**: python code you want to execute, it has to be string.
+
+Now you are ready to go and get value of any variable or execute any function and get its return value from this environment.
+
+- In your JS code, you can execute python code using `window.execPy`
+    ```javascript
+    window.execPy(window.mainApp, "main()").then(function(r){console.log(r)})
+    ```
+   
+    **window.execPy()**
+    | Parameters | Details |
+    |---|---|
+    | environ       | is the environment name we have exposed in python. You can access it by typing **window.&lt;The name you have set in python&gt;** which is **mainApp** in the previous example |
+    | pythonCode    | python code you want to execute, it has to be string |
+
   
-You notice, **window.mainApp** is the same name we used to expose things in python.
+You notice **mainApp** in **window.mainApp** is the same name we used to expose things in python.
+
+---
 
 ### Full example to demonstrate 
 
