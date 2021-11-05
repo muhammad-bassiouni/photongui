@@ -1,0 +1,54 @@
+
+
+body {
+  overflow: hidden;
+}
+
+html{
+  scroll-behavior: smooth;
+}
+
+.container{
+  padding-top:50px;
+}
+
+/* image */
+
+.image{
+  width: 50%;
+  margin-right: auto;
+  margin-left: auto;
+  padding: 10px;
+  border-radius: 5px;
+  text-align: center;
+}
+
+img{
+  max-width: 100%;
+  border-radius: 5px;
+}
+
+.start{
+  padding: 5px;
+  width: 100%;
+  border-radius: 5px;
+  margin-top: 1rem;
+  border: none;
+  background: #28a745;
+  color: white;
+  outline: none;
+}
+
+.loader{
+  display: none;
+  text-align: center;
+}
+
+.note{
+  display: block;
+  background: #bd2130;
+  padding: 5px;
+  border-radius: 5px;
+  width: fit-content;
+  color: white;
+}

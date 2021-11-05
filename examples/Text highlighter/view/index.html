@@ -1,0 +1,26 @@
+<html lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="main.css">
+</head>
+<body>
+    <div class="container">
+        <div class="media">
+            <audio id="myAudio"  width="320" height="176" controls>
+                <source src="./audio/wise-old-owl.mp3" type="audio/wav">
+                <!-- audio from: https://www.englishclub.com -->
+            </audio>
+            <button id="subtitle_btn" data-bs-toggle="modal" data-bs-target="#staticBackdrop">Show Subtitle</button>
+        </div>
+        <p>
+            <ul>
+                <li>Click <b>Show Subtitle</b> button</li>
+                <li>Run the audio file</li>
+            </ul>
+        </p>
+        <div id="subtitle_box">
+        </div>
+    </div>
+    <script src="main.js"></script>
+</body>
+</html>

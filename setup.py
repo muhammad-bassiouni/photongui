@@ -21,16 +21,16 @@ extra_require = {
 
 setup(
     name="photongui",
-    version="1.0.1",
+    version="1.1.0",
     author="Muhammed Bassiouni",
     author_email="",
     description="Build GUI in Python with JavaScript, HTML, and CSS.",
     long_description=README,
     long_description_content_type="text/markdown",
     url="https://github.com/Mohamed501258/photongui",
-    license="MIT",
+    license="New BSD license",
     classifiers=[
-        "License :: OSI Approved :: MIT License",
+        "License :: OSI Approved :: BSD License",
         'Operating System :: OS Independent',
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.5",
@@ -40,8 +40,8 @@ setup(
     ],
     include_package_data=True,
     package_dir={'photongui': 'photongui'},
-    packages=['photongui', 'photongui.api'],
-    package_data={'photongui': ['photongui/gui/images/icon.png']},
+    packages=['photongui', 'photongui.api', 'photongui.api.utils'],
+    package_data={'photongui': ['gui/images/icon.png', 'config.py', 'data.py']},
     install_requires=install_requires,
     extra_requir=extra_require
 )

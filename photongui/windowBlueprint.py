@@ -5,26 +5,28 @@ Copyright (c) 2021, Muhammed Bassiouni
 All rights reserved.
 """
 
-from cefpython3 import cefpython as cef
+
 import ctypes 
-try:
-    import tkinter as tk
-except ImportError:
-    import tkinter as tk
+import tkinter as tk
 import tkinter.filedialog as tkfiledialog
 import tkinter.messagebox as tkmessagebox
 import os
-import threading
+import sys
 import platform
 import re
 import string
 import random
 import time
+import webbrowser
+from cefpython3 import cefpython as cef
 
-import photongui
+from photongui import threaded
+from photongui.util import logger
+from photongui.data import defaultIcon
+from photongui.api import js, css
+from photongui.api.utils import loadSnippet, loadCssFile
 
-from photongui.api import py_js_bridge, css, drag, loadSnippet, alert
-import photongui.window
+
 
 # Fix for PyCharm hints warnings
 WindowUtils = cef.WindowUtils()
@@ -36,23 +38,46 @@ MAC = (platform.system() == "Darwin")
 
 # Global Variables
 execJsOperations = {}
-windowsId = {}
-evt = threading.Event()
+allWindows = {} # access the window by its ID
+envsName = []
 
-# Global stuff
-# Some WindowsOS styles, required for task bar integration
+# Global stuff #
+# WindowsOS styles:
 GWL_EXSTYLE = -20
+GWL_STYLE = -16
 WS_EX_APPWINDOW = 0x00040000
 WS_EX_TOOLWINDOW = 0x00000080
 
+WS_MINIMIZEBOX = 131072
+WS_MAXIMIZEBOX = 65536
 
-# Global config
+SWP_NOZORDER = 4
+SWP_NOMOVE = 2
+SWP_NOSIZE = 1
+SWP_FRAMECHANGED = 32
+
+set_window_pos = ctypes.windll.user32.SetWindowPos
+set_window_long = ctypes.windll.user32.SetWindowLongPtrW
+get_window_long = ctypes.windll.user32.GetWindowLongPtrW
+get_parent = ctypes.windll.user32.GetParent
+
+# Path:
+if getattr(sys, 'frozen', False):
+    application_path = os.path.dirname(sys.executable)
+elif __file__:
+    application_path = os.path.dirname(__file__)
+
+# Global browser config #
 bindings = cef.JavascriptBindings(bindToFrames=True, bindToPopups=True)
 
+# App info #
+#TODO 
+
+# Window general settings #
 WINDOW_SETTINGS = {
     "title": "PhotonGUI",
-    "view": "<html><h1 class='window-drag-area'>Welcome To PhotonPy</h1></html>",
-    "icon":r"gui\images\icon.png",
+    "view": "<html><body><h1 class='window-drag-area'>Welcome To PhotonGUI</h1></body></html>",
+    "icon": os.path.join(application_path, r"gui\images\icon.png"),
     "width":600,
     "height":600,
     "position":None,
@@ -61,28 +86,28 @@ WINDOW_SETTINGS = {
     "fullscreen":False,
     "minimized":False,
     "maximized":False,
-    "min_size":None,
-    "max_size":None,
+    "minSize":None,
+    "maxSize":None,
     "hidden":False,
     "borderless":False,
-    "border_color":None,
-    "border_thickness":None,
+    "borderColor":None,
+    "borderThickness":None,
     "padding":(0,0),
     "toolwindow":True,
-    "allow_minimize":True,
-    "allow_maximize":True,
-    "on_top":False,
-    "movable":True,
-    "background_color":"#FFFFFF",
+    "minimizable":True,
+    "maximizable":True,
+    "onTop":False,
+    "backgroundColor":"#FFFFFF",
     "transparency":1,
-    "transparentcolor":None,
-    "allow_text_selection":False,
-    "flexible_drag":False,
-    "closable":True
+    "transparentColor":None,
+    "contentSelection":False,
+    "flexibleDrag":False,
+    "closable":True,
+    "showOnReady":True
 }
 
 BROWSER_SETTINGS = {
-    "web_security_disabled": True,
+    "web_security_disabled": False,
     "file_access_from_file_urls_allowed": True,
     "universal_access_from_file_urls_allowed": True,
     "javascript_close_windows_disallowed":True,
@@ -93,52 +118,48 @@ BROWSER_SETTINGS = {
 }
 
 # This function to recieve the return from js to handle and store it in python
-def pyCallBack(action, finalReturn):
+def _pyCallBack(action, finalReturn): 
     if action == "execJs":
-        operation_id = finalReturn[0]
-        operation_result = finalReturn[1]
-        execJsOperations[operation_id] = operation_result
-    if action == "moveWindow": # in order to set the drag area, you have to set the element class name to be "window-drag-area"
-        windowId = finalReturn[0]
-        x = finalReturn[1][0]
-        y = finalReturn[1][1]
-        windowsId[windowId].window.geometry(f"+{x}+{y}")
+        execJsOperations[finalReturn[0]] = finalReturn[1] # finalReturn = [operationID, operationResult]
+    if action == "dragWindow": 
+        allWindows[finalReturn[0]].window.geometry(f"+{finalReturn[1][0]}+{finalReturn[1][1]}") # finalReturn = [windowID, [x, y]]
     if action == "msg":
-        print(finalReturn)
+        logger.info(finalReturn)
 
-# This class gives some utilites, like expose all variables and functions of the current working file to browser
-class Util:
+def _customAlert(message, windowid):
+    tkmessagebox.showinfo(title=allWindows[windowid].title, message=message, parent=allWindows[windowid])
+
+# This class gives some utilites, like exposing python environment to all browsers
+class Util: 
     name = None
     eviron = None
-    def exposeAll(self, name, environ=None):
-        self.name = name
-        self.environ = environ
-        bindings.SetObject(name, self)
+    class exposeAll:
+        def __init__(self, name, environ=None):
+            self.name = name
+            self.environ = environ
+            envsName.append(name)
+            bindings.SetObject(name, self)
+            
+        @threaded
+        def _evaluatePyCode(self,windowid, operationid, pyCode):
+            try:
+                return_value = eval(pyCode, self.environ)
+                status = 200
+            except Exception as e:
+                return_value = str(e)
+                status = 500
+            allWindows[windowid].execJsFunctionAsync("execJs", ["return", status, operationid, return_value])
 
-    # Note: Don't use the following method, to avoid problems, this method is used by js inside browser to exec py code and handle return back
-    def evaluatePyCode(self,windowid, operationid, pyCode):
-        windowid = windowid
-        operationid = operationid
-        try:
-            return_value = eval(pyCode, self.environ)
-            status = 200
-        except Exception as e:
-            return_value = str(e)
-            status = 500
-        windowsId[windowid].execJsFunctionAsync("execJs", ["return", status, operationid, return_value])
 
-def custom_alert(alert_message, windowid):
-    tkmessagebox.showinfo(title="Alert", message=alert_message, parent=windowsId[windowid])
-
-bindings.SetFunction("customAlert", custom_alert)
-bindings.SetFunction("pyCallBack", pyCallBack)
+bindings.SetFunction("customAlert", _customAlert)
+bindings.SetFunction("pyCallBack", _pyCallBack)
 
 
 class windowFrame(tk.Frame):
     windowCount = 0
     def __init__(self, window, window_settings=None, parent=None, modal=None, confirm_close=None):
         windowFrame.windowCount+=1
-        self.window = window # you can access all tkinter window features through this attri
+        self.window = window 
         self.__settings = WINDOW_SETTINGS if not window_settings else window_settings
         self.__parent = parent if parent else None
         self.__modal = modal
@@ -149,18 +170,24 @@ class windowFrame(tk.Frame):
         self.__browser_frame = None
         self.__centerTheWindowByDefault = True
 
+        self._windowAndBrowserExist = False
+        self._loadingTimesThreshold = 0
+
         self.__windowFrame_attributes_generator() # This generates attributes of this class from "WINDOW_SETTINGS" dynamically
 
         self.__view = self.__handle_view(self.view)
 
-        # adding new method to the defualt tkinter window methods
+        # New methods to the defualt tkinter window methods
         self.window.centerWindow = self.__centerWindow
         self.window.setIcon = self.__setIcon
         self.window.toggleFullscreen = self.__toggleFullscreen
+        self.window.minimizeMaximize = self.__handle_minimize_maximize
+
+        self.fileDialog = _filedialog(self.window)
 
         self.__set_default_window_settings() # after generating the required attributes to initiate the window, now we structure the window based on them
 
-        tk.Frame.__init__(self, self.window, highlightbackground=self.border_color, highlightthickness=self.border_thickness, padx=self.padding[0], pady=self.padding[1])
+        tk.Frame.__init__(self, self.window, highlightbackground=self.borderColor, highlightthickness=self.borderThickness, padx=self.padding[0], pady=self.padding[1])
         self.master.protocol("WM_DELETE_WINDOW", self.__on_close)
         self.master.bind("<Destroy>", self.__on_destroy)
         self.master.bind("<Configure>", self.__on_window_configure)
@@ -172,15 +199,12 @@ class windowFrame(tk.Frame):
 
         ## BrowserFrame
         self.__browser_frame = BrowserFrame(self, self.__view)
-        self.__browser_frame.grid(row=1, column=0,
+        self.__browser_frame.grid(row=0, column=0,
                                 sticky=(tk.N + tk.S + tk.E + tk.W))
-        tk.Grid.rowconfigure(self, 1, weight=1)
+        tk.Grid.rowconfigure(self, 0, weight=1)
         tk.Grid.columnconfigure(self, 0, weight=1)
-
-        # Pack WindowFrame
         self.pack(fill=tk.BOTH, expand=tk.YES)
 
-      
     ## private methods
     def __windowFrame_attributes_generator(self):
         for key, value in WINDOW_SETTINGS.items():
@@ -189,29 +213,29 @@ class windowFrame(tk.Frame):
     def __set_default_window_settings(self):
         self.window.title(self.title)
         self.window.after(20, self.__setIcon, self.icon)
-        self.window.attributes('-fullscreen', self.fullscreen, '-topmost',self.on_top, '-alpha',self.transparency, '-disabled',self.disabled)
-        self.window.configure(bg=self.background_color)
+        self.window.attributes('-fullscreen', self.fullscreen, '-topmost',self.onTop, '-alpha',self.transparency, '-disabled',self.disabled)
+        self.window.configure(bg=self.backgroundColor)
         self.window.resizable(self.resizable[0], self.resizable[1])
         
-        if self.minimized: # this integration causeس the following issue: related to cef -> it freezes the whole browser
-            self.window.iconify()
+        if self.showOnReady:
+            self.window.withdraw()
         if self.__modal:
             if self.__parent:
                 self.setWindowAsModal(self.__parent)
             else:
-                photongui.logger.warn("The modal window mode will not work unless you set the parent window!")
-        if self.transparentcolor:
-            self.window.attributes('-transparentcolor',self.transparentcolor)
+                logger.warn("The modal window mode will not work unless you set the parent window!")
+        if self.transparentColor:
+            self.window.attributes('-transparentcolor',self.transparentColor)
         if self.maximized:
             self.window.state('zoomed')
-        if self.min_size:
-            self.window.minsize(self.min_size[0], self.min_size[1])
-        if self.max_size:
-            self.window.maxsize(self.max_size[0], self.max_size[1])
+        if self.minimized:
+            self.window.iconify()
+        if self.minSize:
+            self.window.minsize(self.minSize[0], self.minSize[1])
+        if self.maxSize:
+            self.window.maxsize(self.maxSize[0], self.maxSize[1])
         if self.hidden:
             self.window.withdraw()
-        if not self.allow_maximize:
-            self.window.resizable(False, False)
         if not self.toolwindow:
             self.window.attributes('-toolwindow', True)
         if self.position:
@@ -219,13 +243,13 @@ class windowFrame(tk.Frame):
             self.window.geometry(f"{self.width}x{self.height}+{self.position[0]}+{self.position[1]}")
         if not self.position:
             self.__centerWindow()
-        if not self.movable:
-            self.window.bind_all('<Configure>', self.__fixWindowPosition)
         if self.borderless:
             self.window.overrideredirect(self.borderless)
             if WINDOWS:
                 self.window.after(100, self.__set_taskbar_icon_for_borderless_window)
-        
+
+        self.window.after(100, lambda: self.__handle_minimize_maximize(maximizable=self.maximizable, minimizable=self.minimizable))
+
         self.__add_windowId_to_dict()
 
     def __setIcon(self, iconPath):
@@ -235,23 +259,42 @@ class windowFrame(tk.Frame):
                 icon = tk.PhotoImage(file=icon_path)
                 self.window.tk.call('wm', 'iconphoto', self.window._w, icon)
             except:
-                photongui.logger.warn("The icon couldn't be set due to unknown problem. Try to use another one and make sure you put the correct path and the image is of type '.png'")
+                logger.warn("The icon couldn't be set due to unknown problem. Try to use another one and make sure you put the correct path and the image is of type '.png'")
         else:
-            photongui.logger.info("If you are trying to set icon and it doesn't show, Check icon path and icon extenstion to be '.png'")
-            icon_path = os.path.join(os.path.dirname(__file__), "gui\images\icon.png")
-            icon = tk.PhotoImage(file=icon_path)
+            logger.info("If you are trying to set icon and it doesn't show, Check the icon-path and icon-extenstion to be '.png or .pgm or .ppm or .gif'")
+            icon = tk.PhotoImage(data=defaultIcon)
             self.window.tk.call('wm', 'iconphoto', self.window._w, icon)  
 
     def __set_taskbar_icon_for_borderless_window(self):
-        hwnd = ctypes.windll.user32.GetParent(self.window.winfo_id())
-        stylew = ctypes.windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+        hwnd = get_parent(self.window.winfo_id())
+        stylew = get_window_long(hwnd, GWL_EXSTYLE)
         stylew = stylew & ~WS_EX_TOOLWINDOW
         stylew = stylew | WS_EX_APPWINDOW
-        res = ctypes.windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, stylew)
-        # re-assert the new window style
+        set_window_long(hwnd, GWL_EXSTYLE, stylew)
         self.window.wm_withdraw()
-        self.window.after(10, self.window.wm_deiconify)
+        self.window.wm_deiconify()
 
+    def __handle_minimize_maximize(self, minimizable=True, maximizable=True):
+        if WINDOWS:
+            hwnd = get_parent(self.window.winfo_id())
+            new_style = old_style = get_window_long(hwnd, GWL_STYLE)
+            if not minimizable:
+                new_style = old_style & ~ WS_MINIMIZEBOX
+            if not maximizable:
+                new_style = old_style & ~ WS_MAXIMIZEBOX
+            if not maximizable and not minimizable:
+                new_style = old_style & ~ WS_MINIMIZEBOX & ~ WS_MAXIMIZEBOX
+            set_window_long(hwnd, GWL_STYLE, new_style)
+            set_window_pos(hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED)
+        
+        if not WINDOWS:
+            if not minimizable:
+                logger.warning("disabling 'minimizable' is only available for windows!")
+            if not maximizable:
+                self.window.resizable(False, False)
+            if not maximizable and not minimizable:
+                logger.warning("disabling 'minimizable' and 'maximizable' is only available for windows!")
+    
     def __centerWindow(self):
         if self.__centerTheWindowByDefault:
             windowWidth, windowHeight = self.width, self.height
@@ -262,17 +305,12 @@ class windowFrame(tk.Frame):
         center = (position_x, position_y)
         self.window.geometry(f"{self.width}x{self.height}+{center[0]}+{center[1]}")
 
-    def __fixWindowPosition(self, event): # This function needs some work to make it work correctly
+    def __fixWindowPosition(self, event): # This method doesn't work correctly
         X = self.window.winfo_geometry().split("+")[1]
         Y = self.window.winfo_geometry().split("+")[2]
         self.window.geometry("+{}+{}".format(X,Y))
 
     def __handle_view(self, view):
-        """this function handle what will be viewed on the browser based on the input:
-        * if the view starts with "htmlcode:" then it will be treated as pure html input
-        * if the view starts with "http" then it will treated as link
-        * if the view is not one of the previous, then it will be treated as local .html file
-        """
         view = view.strip()
         if ("<html>") in view:
             view = f'data:text/html,{view}'
@@ -289,43 +327,35 @@ class windowFrame(tk.Frame):
             self.window.attributes('-fullscreen', True)
     
     def __add_windowId_to_dict(self):
-        windowsId[self.window.winfo_id()] = self
+        allWindows[self.window.winfo_id()] = self
 
-    def __does_window_exist(self):
-        try:
-            if self.master.winfo_exists(): # we check if window exists or not to avoid crashes
-                return True
-            else:
-                photongui.logger.error("The window doesn't exist!")
+    def _check_window_and_dom(func):
+        def wrapper(self, *arg, **kw):
+            try:
+                if self.master.winfo_exists():
+                    while not self.__browser_frame.isDocumentReady:
+                        continue
+                    try:
+                        return func(self, *arg, **kw)
+                    except Exception as e:
+                        logger.error(f"Error during executing the function! >> {e}")
+                        return None
+                logger.error("The window doesn't exist!")
                 return False
-        except:
-            photongui.logger.error("Can't check if window exist or not")
-            return False
-
-    def __check_window_and_browser(self):
-        try:
-            if self.master.winfo_exists(): # we check if window exists or not to avoid crashes
-                pass
-            else:
-                photongui.logger.error("The window doesn't exist!")
+            except:
+                logger.error("Can't check window or browser")
                 return False
-
-            while not self.__browser_frame.initialized:
-                time.sleep(0.5)  
-        
-            return True
-        except:
-            photongui.logger.error("Can't check window or browsr")
-            return False
-
-    # public methods    
+        return wrapper
+            
+    ## public methods    
     def setWindowAsModal(self, parent):
         try:
             parent.attributes('-disabled', True)
+            self.__parent = parent
         except:
-            parent = parent.window # in case this method is called from outside this file
+            parent = parent.window # In case this method is called from outside 
+            self.__parent = parent
             parent.attributes('-disabled', True)
-        #self.window.grab_set() # this causes other windows to be not closed correctly
         self.window.wm_transient(parent)
     
     def messagebox(self, action, title=None, message=None):
@@ -344,256 +374,115 @@ class windowFrame(tk.Frame):
         if action == "yesno":
             return tkmessagebox.askyesno(title, message, parent=self.window)
 
-    def fileDialog(self, action, title=None, default_extenxion=None, file_types=None, initial_dir=None, initial_file=None, allow_multiple=False):
-        """
-        * available actions:\n
-            \t- "saveasfilename"\n
-            \t- "saveasfile"\n
-            \t- "openfilename"\n
-            \t- "openfile"\n
-            \t- "selectdirectory"\n
-            \t- "openfilenames"\n
-            \t- "openfiles"
-
-        * Example of setting the file types:\n
-            \tfiletypes = (("Text files", "*.txt")
-                    ,("HTML files", "*.html;*.htm")
-                    ,("All files", "*.*") )
-        """
-        self.window.update_idletasks() # adding this here fixes the focus issue
-        options = {}
-        if title:
-            options['title'] = title
-        if initial_file:
-            options["initialfile"] = initial_file
-        options["parent"] = self.window
-        options['defaultextension'] = '.*' if not default_extenxion else default_extenxion
-        options['filetypes'] = [('All Files', '.*')] if not file_types else file_types
-        options['initialdir'] = '/' if not initial_dir else initial_dir
-        options["multiple"] = allow_multiple
-        """trying to add the ability to show or hide hidden files with openfiledialog
-        try:
-            self.window.tk.call('tk_getOpenFile', '-foobarbaz')
-        except:
-            pass
-        self.window.tk.call('set', '::tk::dialog::file::showHiddenBtn', '1')
-        self.window.tk.call('set', '::tk::dialog::file::showHiddenVar', '0')
-        """
-        if action == "saveasfilename": return tkfiledialog.asksaveasfilename(**options)
-        if action == "saveasfile": return tkfiledialog.asksaveasfile(**options)
-        if action == "openfilename": return tkfiledialog.askopenfilename(**options)
-        if action == "openfile": return tkfiledialog.askopenfile(**options)
-        if action == "selectdirectory": return tkfiledialog.askdirectory(**options)
-        if action == "openfilenames": return tkfiledialog.askopenfilenames(**options)
-        if action == "openfiles": return tkfiledialog.askopenfiles(**options)
-
-    # Change the current view of the window, may be: new url or new html text or new html file
+    @_check_window_and_dom
     def loadView(self, view):
         view = self.__handle_view(view)
-        time.sleep(0.1)
-        self.__browser_frame.initialized = False # This is important to make sure that any next execution wait till the initialized status of browser become True again through "OnLoadStateChange" of browser
+        self.__browser_frame.isDocumentReady = False
         self.__browser_frame.browser.LoadUrl(view)
 
+    @_check_window_and_dom
     def loadSnippet(self, elementSelector, snippet, position):
-        """ You can use this method to inject html code into the current view.
-        
-        ### How to use it:
-        * elementSelector [str]: specify element by css selector, e.g. for class you put '.' befor element class name and so on.
-        * snippet [str]: the html code or whatever you want to inject.
-        * position [str]: the position where the code will be injected, the available options are:\n
-            [1] 'beforebegin': Before the element itself.\n
-            [2] 'afterbegin': Just inside the element, before its first child. \n
-            [3] 'beforeend': Just inside the element, after its last child.\n
-            [4] 'afterend': After the element itself.\n
-        
-        """
         inject = loadSnippet.src % {"elementSelector":elementSelector, "snippet":snippet, "position":position}
-        while not self.__browser_frame.initialized:
-            time.sleep(0.5)  
         self.__browser_frame.browser.ExecuteJavascript(inject)
     
-    def execJsAsync(self, js_code): # execute js code asynchronously
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
-            return  
+    @_check_window_and_dom
+    def loadCssFile(self, filePath):
+        inject = loadCssFile.src(filePath)
+        self.__browser_frame.browser.ExecuteJavascript(inject)
 
+    @_check_window_and_dom
+    def execJsAsync(self, js_code): # execute js code asynchronously 
         self.__browser_frame.browser.ExecuteJavascript(js_code)
 
+    @_check_window_and_dom
     def execJsSync(self, js_code): # execute js code synchronously
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
-            return 
-
         operation_id = self.__create_random_id()
         execJsOperations[operation_id] = None   
         self.__browser_frame.browser.ExecuteFunction("execJs", ["exec", operation_id, js_code])
         while not execJsOperations[operation_id]:
-            time.sleep(0.5)
+            time.sleep(0.01)
         return_value = execJsOperations[operation_id]
-        del execJsOperations[operation_id] # To free memory
+        del execJsOperations[operation_id] # free memory
         return return_value
 
-    def execJsFunctionAsync(self, function_name, function_parameres=[]):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
-            return 
-        self.__browser_frame.browser.ExecuteFunction(function_name, function_parameres)
+    @_check_window_and_dom
+    def execJsFunctionAsync(self, function_name, function_parameters=[]):
+        self.__browser_frame.browser.ExecuteFunction(function_name, function_parameters)
 
+    @_check_window_and_dom
     def getUrl(self):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
-            return 
         return self.__browser_frame.browser.GetUrl() 
- 
+    
+    @_check_window_and_dom
     def getZoomLevel(self):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
-            return 
         return self.__browser_frame.browser.GetZoomLevel()
     
+    @_check_window_and_dom
     def setZoomLevel(self, zoom_level=0):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
-            return 
         self.__browser_frame.browser.SetZoomLevel(zoom_level)
 
+    @_check_window_and_dom
     def canGoForward(self):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
-            return 
         return self.__browser_frame.browser.CanGoForward()
 
+    @_check_window_and_dom
     def goForward(self):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
-            return 
         self.__browser_frame.browser.GoForward()
     
-    def canGoBack(self):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
-            return         
+    @_check_window_and_dom
+    def canGoBack(self):        
         return self.__browser_frame.browser.CanGoBack()
 
-    def goBack(self):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
-            return         
+    @_check_window_and_dom
+    def goBack(self):      
         self.__browser_frame.browser.GoBack()
-   
-    def findInBrowser(self, search_id=None, search_text="", forward=False, match_case=False, find_next=False):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
-            return         
-        self.__browser_frame.browser.Find(search_id, search_text, forward, match_case, find_next)
-
-    def stopFinding(self, clear_selection=True):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
-            return         
-        self.__browser_frame.browser.StopFinding(clear_selection)
-
-    def downloadFromURL(self, url=None):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
-            return         
-        self.__browser_frame.browser.StartDownload(url)
     
-    def reloadWindow(self): # Reload the current page without ignoring any cached data.
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
-            return         
+    @_check_window_and_dom
+    def find(self, searchId=0, searchText="", forward=False, matchCase=False, findNext=False):       
+        self.__browser_frame.browser.Find(searchId, searchText, forward, matchCase, findNext)
+    
+    @_check_window_and_dom
+    def stopFinding(self, clearSelection=False):     
+        self.__browser_frame.browser.StopFinding(clearSelection)
+    
+    @_check_window_and_dom
+    def downloadFromURL(self, url=None):      
+        self.__browser_frame.browser.StartDownload(url)
+        
+    @_check_window_and_dom
+    def reload(self): 
         self.__browser_frame.browser.Reload()
     
-    def reloadWindoInogreCache(self): # Reload the current page ignoring any cached data.
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
-            return         
+    @_check_window_and_dom
+    def reloadInogreCache(self): 
         self.__browser_frame.browser.ReloadIgnoreCache()
 
-    def isWindowLoaded(self):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
-            return         
-        return self.__browser_frame.browser.HasDocument()
+    def isDocumentReady(self):     
+        return self.__browser_frame.isDocumentReady
     
-    def stopLoadingPage(self):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
-            return         
-        self.__browser_frame.browser.StopLoad()
+    @_check_window_and_dom
+    def stopLoad(self):      
+        return self.__browser_frame.browser.StopLoad()
 
-    def printWindowContent(self):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
-            return         
+    @_check_window_and_dom
+    def print(self):       
         return self.__browser_frame.browser.Print()
     
-    def sendKeyEvent(self, key_event=None):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
-            return         
-        self.__browser_frame.browser.SendKeyEvent(key_event)
+    @_check_window_and_dom
+    def sendKeyEvent(self, event=None):      
+        self.__browser_frame.browser.SendKeyEvent(event)
 
-    def sendMouseMoveEvent(self,x=0, y=0, mouse_leave=False):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
-            return         
-        self.__browser_frame.browser.SendMouseMoveEvent(x, y, mouse_leave)
+    @_check_window_and_dom
+    def sendMouseMoveEvent(self,x=0, y=0, mouseLeave=False, modifiers=None):       
+        self.__browser_frame.browser.SendMouseMoveEvent(x, y, mouseLeave, modifiers)
 
-    def sendMouseClickEvent(self, x=0, y=0, mouseButtonType=1, mouseUp=True, clickCount=1, modifiers=1):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
-            return         
-        """ How to use it:
-        - x [int]
-        - y [int]
-        - mouseButtonType [int] may be one of:\n
-            \t1] MOUSEBUTTON_LEFT \n
-            \t2] MOUSEBUTTON_MIDDLE\n
-            \t3] MOUSEBUTTON_RIGHT\n
-        - modifiers flags [int]:\n
-            \t1] EVENTFLAG_NONE\n
-            \t2] EVENTFLAG_CAPS_LOCK_ON\n
-            \t3] EVENTFLAG_SHIFT_DOWN\n
-            \t4] EVENTFLAG_CONTROL_DOWN\n
-            \t5] EVENTFLAG_ALT_DOWN\n
-            \t6] EVENTFLAG_LEFT_MOUSE_BUTTON\n
-            \t7] EVENTFLAG_MIDDLE_MOUSE_BUTTON\n
-            \t8] EVENTFLAG_RIGHT_MOUSE_BUTTON\n
-            \t9] EVENTFLAG_COMMAND_DOWN (Mac)\n
-            \t10] EVENTFLAG_NUM_LOCK_ON (Mac)\n
-            \t11] EVENTFLAG_IS_KEY_PAD (Mac)\n
-            \t12] EVENTFLAG_IS_LEFT (Mac)\n
-            \t13] EVENTFLAG_IS_RIGHT (Mac)\n
-        - mouseUp [bool]
-        - clickCount [int]
-        """
+    @_check_window_and_dom
+    def sendMouseClickEvent(self, x=0, y=0, mouseButtonType=1, mouseUp=True, clickCount=1, modifiers=1):       
         self.__browser_frame.browser.SendMouseClickEvent(x, y, mouseButtonType, mouseUp, clickCount, modifiers)
     
-    def sendMouseWheelEvent(self, x=0, y=0, deltaX=0, deltaY=0, modifiers=1):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
-            return 
-                    
-        """ How to use it:
-        - x [int]
-        - y [int]
-        - deltaX [int]
-        - deltaY [int]
-
-        - modifiers flags [int]:\n
-            \t1] EVENTFLAG_NONE\n
-            \t2] EVENTFLAG_CAPS_LOCK_ON\n
-            \t3] EVENTFLAG_SHIFT_DOWN\n
-            \t4] EVENTFLAG_CONTROL_DOWN\n
-            \t5] EVENTFLAG_ALT_DOWN\n
-            \t6] EVENTFLAG_LEFT_MOUSE_BUTTON\n
-            \t7] EVENTFLAG_MIDDLE_MOUSE_BUTTON\n
-            \t8] EVENTFLAG_RIGHT_MOUSE_BUTTON\n
-            \t9] EVENTFLAG_COMMAND_DOWN (Mac)\n
-            \t10] EVENTFLAG_NUM_LOCK_ON (Mac)\n
-            \t11] EVENTFLAG_IS_KEY_PAD (Mac)\n
-            \t12] EVENTFLAG_IS_LEFT (Mac)\n
-            \t13] EVENTFLAG_IS_RIGHT (Mac)\n
-
-        - mouseUp [bool]
-
-        - clickCount [int]
-        """
+    @_check_window_and_dom
+    def sendMouseWheelEvent(self, x=0, y=0, deltaX=0, deltaY=0, modifiers=1):         
         self.__browser_frame.browser.SendMouseWheelEvent(x, y, deltaX, deltaY, modifiers)
-
-    def setAccessibilityState(self, state="default"):
-        if not self.__check_window_and_browser(): # we check if window exists or not to avoid crashes
-            return         
-        """Available state:
-        - default
-        - enabled
-        - disabled
-        """
-        states = {"default":1, "enabled":2, "disabled":3}
-        if state not in states.keys():
-            photongui.logger.error(f"You have to set the state value to be on of the following {states.keys()}")
-        else:
-            self.__browser_frame.browser.SetAccessibilityState(states[state])
 
     ## static methods
     @staticmethod
@@ -602,33 +491,28 @@ class windowFrame(tk.Frame):
         id = ''.join(random.choice(characters) for i in range(8))
         return id
 
-    ## Window sensors of to handle the browser frame 
+    # Window sensors to handle the browser frame 
     def __on_window_configure(self, _):
-        photongui.logger.debug(f"MainFrame: {self}.on_window_configure")
         if self.__browser_frame:
             self.__browser_frame.on_window_configure()
 
     def __on_configure(self, event):
-        photongui.logger.debug(f"MainFrame: {self}.on_configure")
         if self.__browser_frame:
-            width = event.width
-            height = event.height
-
-            self.__browser_frame.on_mainframe_configure(width, height)
+            self.__browser_frame.on_mainframe_configure(event.width, event.height)
 
     def __on_focus_in(self, _):
-        photongui.logger.debug(f"MainFrame: {self}.on_focus_in")
+        logger.debug(f"MainFrame: {self}.on_focus_in")
 
     def __on_focus_out(self, _):
-        photongui.logger.debug(f"MainFrame: {self}.on_focus_out")
-        self.master.focus_force() # <- added
+        self.master.master.focus_force() # <- added
 
     def __on_destroy(self, event):
         if event.widget == self.master:
             windowFrame.windowCount-=1
-            
+            del allWindows[self._windowid]
             if windowFrame.windowCount == 0:
-                photongui.root.destroy()
+                from photongui import root
+                root.destroy()
 
     def __on_close(self):
         if not self.closable:
@@ -643,30 +527,62 @@ class windowFrame(tk.Frame):
             self.window.grab_release()
         if self.__browser_frame:
             self.__browser_frame.on_root_close()
-            self.__browser_frame = None
-         
+            self.__browser_frame = None 
         self.master.destroy()
         
     def __on_escape(self, event):
         if self.window.attributes("-fullscreen"):
-            # you have to set focus on the window to make escape key works
-            self.window.focus_set()
+            #self.window.focus_set()
             self.window.attributes("-fullscreen", False)
 
+class _filedialog():
+    def __init__(self, parentwindow):
+        self.parentwindow = parentwindow 
+
+    def _set_parent_window(func):
+        def wrapper(self, **kw):
+            kw['parent'] = self.parentwindow
+            return func(self, **kw)     
+        return wrapper
+
+    @_set_parent_window
+    def askopenfile(self, **kwargs):
+        return tkfiledialog.askopenfilename(**kwargs)   
+    @_set_parent_window
+    def askopenfiles(self, **kwargs):
+        return tkfiledialog.askopenfiles(**kwargs)    
+    @_set_parent_window
+    def asksaveasfile(self, **kwargs):
+        return tkfiledialog.asksaveasfile(**kwargs)  
+    @_set_parent_window
+    def askopenfilename(self, **kwargs):
+        return tkfiledialog.askopenfilename(**kwargs)    
+    @_set_parent_window
+    def askopenfilenames(self, **kwargs):
+        return tkfiledialog.askopenfilenames(**kwargs)                            
+    @_set_parent_window
+    def asksaveasfilename(self, **kwargs):
+        return tkfiledialog.asksaveasfilename(**kwargs)
+    @_set_parent_window
+    def askdirectory(self, **kwargs):
+        return tkfiledialog.askdirectory(**kwargs)   
+    @_set_parent_window
+    def open(self, **kwargs):
+        return tkfiledialog.Open(**kwargs)             
+  
 
 class BrowserFrame(tk.Frame):
-
     def __init__(self, frame, window_view):
         self.frame = frame
         self.window_view = window_view
         self.closing = False
         self.browser = None
-        self.initialized = False
+        self.isDocumentReady = False
         tk.Frame.__init__(self, frame)
         self.bind("<FocusIn>", self.on_focus_in)
         self.bind("<FocusOut>", self.on_focus_out)
         self.bind("<Configure>", self.on_configure)
-
+        self.after(5, self.embed_browser)
         self.focus_set()
         self.master.master.focus_force() # <- added
 
@@ -680,7 +596,8 @@ class BrowserFrame(tk.Frame):
         assert self.browser
         self.browser.SetClientHandler(LoadHandler(self, self.frame))
         self.browser.SetClientHandler(FocusHandler(self))
-        self.browser.SetJavascriptBindings(bindings) # This step is important to expose python things to js
+        self.browser.SetClientHandler(DisplayHandler())
+        self.browser.SetJavascriptBindings(bindings)
 
         self.message_loop_work()
 
@@ -690,10 +607,10 @@ class BrowserFrame(tk.Frame):
             from AppKit import NSApp
             # noinspection PyUnresolvedReferences
             import objc
-            photongui.logger.info("winfo_id={}".format(self.winfo_id()))
+            logger.info("winfo_id={}".format(self.winfo_id()))
             # noinspection PyUnresolvedReferences
             content_view = objc.pyobjc_id(NSApp.windows()[-1].contentView())
-            photongui.logger.info("content_view={}".format(content_view))
+            logger.info("content_view={}".format(content_view))
             return content_view
         elif self.winfo_id() > 0:
             return self.winfo_id()
@@ -715,49 +632,39 @@ class BrowserFrame(tk.Frame):
 
     def on_mainframe_configure(self, width, height):
         if self.browser:
-            if WINDOWS:
-                ctypes.windll.user32.SetWindowPos(
-                    self.browser.GetWindowHandle(), 0,
-                    0, 0, width, height, 0x0002)
+            if WINDOWS: # This makes stupid crashes and resizing problems
+                set_window_pos(self.browser.GetWindowHandle(),
+                               0, 0, 0, width, height, 0x0002)
             elif LINUX:
                 self.browser.SetBounds(0, 0, width, height)
             self.browser.NotifyMoveOrResizeStarted()
 
     def on_focus_in(self, _):
-        photongui.logger.debug(f"BrowserFrame: {self.frame}.on_focus_in")
         if self.browser:
             self.browser.SetFocus(True)
     
     def on_focus_out(self, _):
-        photongui.logger.debug(f"BrowserFrame: {self.frame}.on_focus_out")
-        """For focus problems see Issue #255 and Issue #535. """
         if LINUX and self.browser:
             self.browser.SetFocus(False)
 
     def on_root_close(self):
-        photongui.logger.debug(f"BrowserFrame: {self.frame}.on_root_close")
         if self.browser:
-            photongui.logger.debug(f"CloseBrowserOf: {self.frame}")
             self.browser.CloseBrowser(True)
-            # Clear browser references that you keep anywhere in your
-            # code. All references must be cleared for CEF to shutdown cleanly.
             self.browser = None
         else:
-            photongui.logger.debug(f"tk.Frame: {self.frame}.destroy")
             self.destroy()
 
 
 class FocusHandler(object):
-
     def __init__(self, browser_frame):
         self.browser_frame = browser_frame
 
-    def OnTakeFocus(self, next_component, **_):
-        photongui.logger.debug("FocusHandler.OnTakeFocus, next={next}"
+    def OnTakeFocus(self, next_component=None, **_):
+        logger.debug("FocusHandler.OnTakeFocus, next={next}"
                      .format(next=next_component))
 
     def OnSetFocus(self, source, **_):
-        photongui.logger.debug("FocusHandler.OnSetFocus, source={source}"
+        logger.debug("FocusHandler.OnSetFocus, source={source}"
                      .format(source=source))
         if LINUX:
             return False
@@ -765,33 +672,58 @@ class FocusHandler(object):
             return True
 
     def OnGotFocus(self, **_):
-        photongui.logger.debug("FocusHandler.OnGotFocus")
-        #self.browser_frame.focus_set() # <- back to the reference implementation: this implementation causes the app to freeze
         if LINUX:
             self.browser_frame.focus_set()
 
+class RenderHandler ():
+    def OnTextSelectionChanged(self, **kwargs):
+        selected_text = kwargs["selected_text"]
+        selected_range = kwargs["selected_range"]
+        logger.info(f"Text selected:\n1] Selected Text: {selected_text}\n2] Selected Range: {selected_range}")
+    
+    def StartDragging(self, **kwargs):
+        drag_data = kwargs["drag_data"]
+        allowed_ops = kwargs["allowed_ops"]
+        x = kwargs["x"]
+        y = kwargs["y"]
+        logger.debug(f"Dragging data on the window: {drag_data}")
+
+class DisplayHandler():
+    def OnAddressChange(self, browser, frame, url):
+        logger.debug(f"window address changed: {url}")
+
+    def OnLoadingProgressChange(self, browser, progress):
+        logger.debug(f"window loading progress: {progress}")
+
+    def OnStatusMessage(self, browser, value):
+        if value:
+            logger.debug(f"window status message recieved: {value}")
+
 
 class LoadHandler():
-
     def __init__(self, browser_frame, windowFrame):
         self.browser_frame = browser_frame
         self.windowFrame = windowFrame
 
-    def OnLoadingStateChange(self, browser, is_loading, **_):
-        self.browser_frame.initialized = False # if you have noticed any wiered behavior related to js executrion remove this line
-        if not is_loading:
-            # injection of default code to take control of browser, you have to wait till browser is loaded 
-            # to make sure that js code execution works fine without problems
-            injection = py_js_bridge.src.replace("WINDOWID", str(self.windowFrame._windowid))
-            if not self.windowFrame.allow_text_selection:
-                injection += css.src
-            if self.windowFrame.flexible_drag:
-                injection += drag.src
-            injection += alert.src
+    def OnBeforePopup(self, **kwargs): # To open target="_blank" in external browser
+        target_url = kwargs['target_url']
+        user_gesture = kwargs['user_gesture']
+        if user_gesture:
+            webbrowser.open(target_url)
+        return True
 
+    def OnLoadingStateChange(self, browser, is_loading, **_):
+        if self.windowFrame._loadingTimesThreshold==0: 
+            self.windowFrame._loadingTimesThreshold=1
+            if not self.windowFrame.hidden and not self.windowFrame.minimized:
+                self.windowFrame.master.deiconify()
+        self.browser_frame.isDocumentReady = False # if you have noticed any wiered behavior related to js executrion remove this line
+        if not is_loading:
+            injection = js.handleJs(self.windowFrame._windowid, self.windowFrame.flexibleDrag)
+            injection += css.handleStyle(self.windowFrame.contentSelection)
             browser.ExecuteJavascript(injection) 
             time.sleep(0.1)
-            self.browser_frame.initialized = True
+            self.browser_frame.isDocumentReady = True
 
     def OnLoadStart(self, browser, **_):
         pass
@@ -800,10 +732,8 @@ class LoadHandler():
         pass
 
     def OnLoadError(self, browser, **_):
-        error_msg = "Please check your internet connection or the right file path"
-        msg_js = f"console.error('{error_msg}'); window.pyCallBack('msg', 'Window: {self.windowFrame.title} {error_msg}')"
-        photongui.logger.error(f'Window: {self.windowFrame.title} ' + error_msg)
-        browser.ExecuteJavascript(msg_js)
+        error_msg = "No internet connection OR incorrect file-path"
+        logger.error(f'Window ID: {self.windowFrame.master.winfo_id()}' + f" | Error message: {error_msg}")
         
 
 

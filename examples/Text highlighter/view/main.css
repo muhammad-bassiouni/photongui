@@ -1,0 +1,45 @@
+audio {
+    margin-top: 1rem;
+    margin-left: auto;
+    margin-right: auto;
+    display: block;
+}
+
+.sub_text{
+	background-color: #25b9c8;
+	color: white;
+    border-radius: 3px;
+    padding: 1px;
+}
+
+#subtitle_btn{
+	border: none;
+    background: #3f51b5;
+    color: white;
+    border-radius: 5px;
+    padding: 5px;
+	cursor: pointer;
+    display: block;
+    margin-top: 1rem;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+#subtitle_btn:active{
+	background: #6172d4;
+}
+
+#subtitle_box{
+	margin-top: 20px;
+    padding: 10px;
+    border: 2px solid #2196f3;
+    border-radius: 5px;
+    font-family: system-ui;
+    overflow: auto;
+    height: 70%;
+}
+
+.media{
+	height: 20%;
+    overflow: auto;
+}

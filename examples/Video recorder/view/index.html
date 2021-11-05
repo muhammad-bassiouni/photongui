@@ -1,0 +1,37 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="main.css">
+</head>
+<body>
+    <!-- Learn about this code on MDN: https://developer.mozilla.org/en-US/docs/Web/API/MediaStream_Recording_API/Recording_a_media_element -->
+    <!-- Note: The html, js and css from  but modified for our purpose -->
+  <br>
+  <div>
+    <span>Record for (s):</span>
+    <input type="number" id='record-time'>
+  </div>
+  <div class="left">
+    <div id="startButton" class="button">
+      Start
+    </div>
+    <h2>Preview</h2>
+    <video id="preview" width="160" height="120" autoplay muted></video>
+  </div>
+  <div class="right">
+    <div id="stopButton" class="button">
+      Stop
+    </div>
+    <h2>Recording</h2>
+    <video id="recording" width="160" height="120" controls></video>
+    <a id="downloadButton" class="button">
+      Download
+    </a>
+  </div>
+  <div class="bottom">
+    <pre id="log"></pre>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>

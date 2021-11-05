@@ -1,0 +1,49 @@
+body {
+    font: 14px "Open Sans", "Arial", sans-serif;
+  }
+  
+  video {
+    margin-top: 2px;
+    border: 1px solid black;
+  }
+  
+  #preview {
+    transform: scaleX(-1);
+  }
+  .button {
+    cursor: pointer;
+    display: block;
+    width: 160px;
+    border: 1px solid black;
+    font-size: 16px;
+    text-align: center;
+    padding-top: 2px;
+    padding-bottom: 4px;
+    color: white;
+    background-color: darkgreen;
+    text-decoration: none;
+  }
+  
+  h2 {
+    margin-bottom: 4px;
+  }
+  
+  .left {
+    margin-right: 10px;
+    float: left;
+    width: 160px;
+    padding: 0px;
+  }
+  
+  .right {
+    margin-left: 10px;
+    float: left;
+    width: 160px;
+    padding: 0px;
+  }
+  
+  .bottom {
+    clear: both;
+    padding-top: 10px;
+  }
+  

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="main.css">
+    <meta charset="UTF-8">
+</head>
+
+<body>
+    <div class="container">
+        <div class="image">
+            <img class="imageFace" id="bg" src="images/facial-recognition.svg" alt="">
+            <button id="startVideo" class="start" elem-data="start" onClick="py_video(this)">Start</button>
+        </div>
+        <div class="options">
+            <div>
+                <input type="checkbox" class="form-check-input" id="faceDetection">
+                <label for="exampleCheck1">Face Detection</label>
+      
+                <input type="checkbox" id="eyeDetection">
+                <label for="exampleCheck1">Eye Detection</label>
+                <span class="note">* Settings apply after stopping the video</span>
+            </div>
+            
+        </div>
+        <div class="loader">
+            <span>Loading, please wait. This may take some time...</span>
+        </div>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>

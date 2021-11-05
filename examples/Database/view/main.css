@@ -1,0 +1,34 @@
+#container{
+    text-align: -webkit-center;
+}
+
+input {
+    outline: none;
+    border-radius: 10px;
+    padding: 5px;
+    display: block;
+    margin-top: 10px;
+    width: 50%;
+}
+
+button {
+    outline: none;
+    border-radius: 5px;
+    padding: 5px;
+    border: none;
+    background: #0a81e8;
+    color: white;
+    margin-top: 10px;
+    width: 100px;
+}
+
+button:active{
+    background-color: #134d80;
+}
+
+#status{
+    width: fit-content;
+    border: 2px solid #075bf5;
+    padding: 5px;
+    border-radius: 5px;
+}
