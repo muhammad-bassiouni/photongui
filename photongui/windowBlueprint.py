@@ -19,6 +19,7 @@ import random
 import time
 import webbrowser
 from cefpython3 import cefpython as cef
+from threading import Event
 
 from photongui import threaded
 from photongui.util import logger
@@ -120,6 +121,7 @@ BROWSER_SETTINGS = {
 # This function to recieve the return from js to handle and store it in python
 def _pyCallBack(action, finalReturn): 
     if action == "execJs":
+        execJsOperations[finalReturn[0]].set()
         execJsOperations[finalReturn[0]] = finalReturn[1] # finalReturn = [operationID, operationResult]
     if action == "dragWindow": 
         allWindows[finalReturn[0]].window.geometry(f"+{finalReturn[1][0]}+{finalReturn[1][1]}") # finalReturn = [windowID, [x, y]]
@@ -333,8 +335,7 @@ class windowFrame(tk.Frame):
         def wrapper(self, *arg, **kw):
             try:
                 if self.master.winfo_exists():
-                    while not self.__browser_frame.isDocumentReady:
-                        continue
+                    self.__browser_frame.isDocumentReady.wait()
                     try:
                         return func(self, *arg, **kw)
                     except Exception as e:
@@ -377,7 +378,7 @@ class windowFrame(tk.Frame):
     @_check_window_and_dom
     def loadView(self, view):
         view = self.__handle_view(view)
-        self.__browser_frame.isDocumentReady = False
+        self.__browser_frame.isDocumentReady = Event()
         self.__browser_frame.browser.LoadUrl(view)
 
     @_check_window_and_dom
@@ -397,10 +398,9 @@ class windowFrame(tk.Frame):
     @_check_window_and_dom
     def execJsSync(self, js_code): # execute js code synchronously
         operation_id = self.__create_random_id()
-        execJsOperations[operation_id] = None   
+        execJsOperations[operation_id] = Event()   
         self.__browser_frame.browser.ExecuteFunction("execJs", ["exec", operation_id, js_code])
-        while not execJsOperations[operation_id]:
-            time.sleep(0.01)
+        execJsOperations[operation_id].wait()
         return_value = execJsOperations[operation_id]
         del execJsOperations[operation_id] # free memory
         return return_value
@@ -577,7 +577,7 @@ class BrowserFrame(tk.Frame):
         self.window_view = window_view
         self.closing = False
         self.browser = None
-        self.isDocumentReady = False
+        self.isDocumentReady = Event()
         tk.Frame.__init__(self, frame)
         self.bind("<FocusIn>", self.on_focus_in)
         self.bind("<FocusOut>", self.on_focus_out)
@@ -717,13 +717,13 @@ class LoadHandler():
             self.windowFrame._loadingTimesThreshold=1
             if not self.windowFrame.hidden and not self.windowFrame.minimized:
                 self.windowFrame.master.deiconify()
-        self.browser_frame.isDocumentReady = False # if you have noticed any wiered behavior related to js executrion remove this line
+        self.browser_frame.isDocumentReady = Event() # if you have noticed any wiered behavior related to js executrion remove this line
         if not is_loading:
             injection = js.handleJs(self.windowFrame._windowid, self.windowFrame.flexibleDrag)
             injection += css.handleStyle(self.windowFrame.contentSelection)
             browser.ExecuteJavascript(injection) 
             time.sleep(0.1)
-            self.browser_frame.isDocumentReady = True
+            self.browser_frame.isDocumentReady.set()
 
     def OnLoadStart(self, browser, **_):
         pass
