@@ -7,7 +7,7 @@ var startY = 0;
 function onMouseMove(ev) {
     var x = ev.screenX - startX;
     var y = ev.screenY - startY;
-    window.pyCallBack('dragWindow', [windowID, [x, y]]);
+    window._pyCallbackOfDrag(windowID, x, y);
 }
 
 function onMouseUp() {
