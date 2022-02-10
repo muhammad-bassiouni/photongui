@@ -122,17 +122,17 @@ Some extra methods have been added to `window`:
 * centerWindow()
 
 * SetIcon()
-|Parameter|Type|
-|----|---------|
-|iconPath|str|
+   |Parameter|Type|
+   |----|---------|
+   |iconPath|str|
 
 * toggleFullscreen()
 
 * minimizeMaximize()
-|Parameter|Type|OS|
-|----|---------|--|
-|minimizable|bool|`Windows`|
-|maximizable|bool|`All`|
+   |Parameter|Type|OS|
+   |----|---------|--|
+   |minimizable|bool|`Windows`|
+   |maximizable|bool|`All`|
 
 #### Example
 ```python
